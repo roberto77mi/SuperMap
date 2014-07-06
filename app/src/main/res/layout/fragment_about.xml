@@ -1,0 +1,23 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="@dimen/double_spacing"
+    tools:context="com.rf.ubermap.AboutFragment">
+
+    <!-- TODO: Update blank fragment layout -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/about_title"
+        android:layout_marginBottom="@dimen/def_spacing"
+        style="@android:style/TextAppearance.DeviceDefault.Large"/>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/about_text"
+        style="@android:style/TextAppearance.DeviceDefault.Small"/>
+
+</LinearLayout>
