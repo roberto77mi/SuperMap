@@ -1,0 +1,18 @@
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="Map goes here."
+        android:textSize="36sp"/>
+    
+     <TextView 
+        android:id="@+id/map_location_text"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:text="location"
+        android:layout_margin="@dimen/double_spacing"
+        style="@android:style/TextAppearance.DeviceDefault.Small"/>
+    
+</FrameLayout>
