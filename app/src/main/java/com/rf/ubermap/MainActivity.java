@@ -6,6 +6,7 @@ import android.app.ActionBar;
 import android.app.Fragment;
 import android.app.FragmentManager;
 import android.content.Context;
+import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
@@ -22,6 +23,8 @@ import android.widget.TextView;
 public class MainActivity extends Activity
         implements NavigationDrawerFragment.NavigationDrawerCallbacks {
 
+
+    MapFragment mMapFragment;
     /**
      * Fragment managing the behaviors, interactions and presentation of the navigation drawer.
      */
@@ -39,7 +42,14 @@ public class MainActivity extends Activity
 
         mNavigationDrawerFragment = (NavigationDrawerFragment)
                 getFragmentManager().findFragmentById(R.id.navigation_drawer);
+
+        //mMapFragment = new MapFragment(); //  never destroyed
+
+
         mTitle = getTitle();
+
+//        FragmentManager fragmentManager = getFragmentManager();
+//        fragmentManager.beginTransaction().add(R.id.container,mMapFragment).commit();
 
         // Set up the drawer.
         mNavigationDrawerFragment.setUp(
@@ -53,36 +63,34 @@ public class MainActivity extends Activity
         FragmentManager fragmentManager = getFragmentManager();
 
         switch (position) {
-            case 0: // will be the map
-                fragmentManager.beginTransaction()
-                        .replace(R.id.container, PlaceholderFragment.newInstance(position + 1))
-                        .commit();
 
+            case 0: // About
+                startActivity(new Intent(this, AboutActivity.class));
                 break;
             case 1: // Settings
-                fragmentManager.beginTransaction()
-                        .replace(R.id.container, new SettingsFragment())
-                        .commit();
-                break;
-            case 2: // About
+                /*
                 fragmentManager.beginTransaction()
                         .replace(R.id.container, new AboutFragment())
                         .commit();
+                */
+                startActivity(new Intent(this, SettingsActivity.class));
+
                 break;
         }
     }
 
     public void onSectionAttached(int number) {
+        // on changing Fragment, currently not used because navigation is opening new activities
         switch (number) {
             case 1:
-                mTitle = getString(R.string.title_section1);
+                mTitle = getString(R.string.title_section_about);
                 break;
             case 2:
-                mTitle = getString(R.string.title_section2);
+                mTitle = getString(R.string.title_section_settings);
                 break;
-            case 3:
-                mTitle = getString(R.string.title_section3);
-                break;
+           // case 3:
+             //   mTitle = getString(R.string.title_section3);
+               // break;
         }
     }
 
