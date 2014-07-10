@@ -1,15 +1,8 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <TextView
-        android:id="@+id/map_location_text"
-        android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:text="location"
-        android:layout_margin="@dimen/double_spacing"
-        android:gravity="center"
-        style="@android:style/TextAppearance.DeviceDefault.Small"/>
 
     <!--
     <fragment
@@ -24,4 +17,21 @@
         android:id="@+id/mapView" />
 
 
-</LinearLayout>
+    <TextView
+        android:id="@+id/map_location_text"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="location"
+        android:gravity="center"
+        android:background="#88888888"
+        android:padding="@dimen/def_spacing"
+        style="@android:style/TextAppearance.DeviceDefault.Small"/>
+
+    <ImageView
+        android:id="@+id/map_bearing_image"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:layout_gravity="center"
+        android:src="@drawable/arrow_blue_semi"/>
+
+</FrameLayout>

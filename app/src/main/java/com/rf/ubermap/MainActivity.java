@@ -24,7 +24,7 @@ public class MainActivity extends Activity
         implements NavigationDrawerFragment.NavigationDrawerCallbacks {
 
 
-    MapFragment mMapFragment;
+   // MapFragment mMapFragment;
     /**
      * Fragment managing the behaviors, interactions and presentation of the navigation drawer.
      */
