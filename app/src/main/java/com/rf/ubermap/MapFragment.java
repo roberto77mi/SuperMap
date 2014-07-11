@@ -120,7 +120,7 @@ GoogleMap.OnCameraChangeListener {
 
         mMapQuestAdapter = new RestAdapter.Builder()
                 .setEndpoint(OpenMapQuest.ENDPOINT)
-                .setLogLevel(RestAdapter.LogLevel.FULL)
+                //.setLogLevel(RestAdapter.LogLevel.FULL)
                 .build();
 
         mOpenMapQuestApi = mMapQuestAdapter.create(OpenMapQuest.class);
@@ -326,7 +326,7 @@ GoogleMap.OnCameraChangeListener {
         mMap.setOnCameraChangeListener(this);
         mMap.setMyLocationEnabled(true);
         mMap.getUiSettings().setCompassEnabled(false);
-       // -- mMap.getUiSettings().setRotateGesturesEnabled(false);
+        mMap.getUiSettings().setRotateGesturesEnabled(false);
        //--  mMap.getUiSettings().setTiltGesturesEnabled(false);
 
         mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
