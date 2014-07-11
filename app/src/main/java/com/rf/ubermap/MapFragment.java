@@ -5,6 +5,7 @@ import com.google.android.gms.common.GooglePlayServicesClient;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.location.LocationClient;
 import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapView;
 import com.google.android.gms.maps.MapsInitializer;
@@ -73,6 +74,8 @@ GooglePlayServicesClient.ConnectionCallbacks,
 GooglePlayServicesClient.OnConnectionFailedListener,
 LocationListener,
 GoogleMap.OnCameraChangeListener {
+
+    private static final String KEY_CAM = "KEY_CAM_POS";
 
     private MapView mMapView;
     private GoogleMap mMap;// Might be null if Google Play services APK is not available.
@@ -214,6 +217,11 @@ GoogleMap.OnCameraChangeListener {
 
     @Override
     public void onDestroy() {
+
+        if (mCameraPosition!=null) {
+            LocationUtil.saveCameraPosition(KEY_CAM,mCameraPosition, getActivity());
+        }
+
         super.onDestroy();
     }
 
@@ -366,8 +374,7 @@ GoogleMap.OnCameraChangeListener {
             }
 
         });
-        // mMap.addMarker(new MarkerOptions().
-        //mMap.a
+
         mMarkerOptionsQueue.add(new MarkerOptions().draggable(true).title("Boy").alpha(0.8f).icon(BitmapDescriptorFactory.fromResource(R.drawable.hp_boy)));
 
         mMarkerOptionsQueue.add(new MarkerOptions().draggable(true).title("Girl").alpha(0.8f).icon(BitmapDescriptorFactory.fromResource(R.drawable.hp_girl)));
@@ -376,6 +383,11 @@ GoogleMap.OnCameraChangeListener {
 
         mMarkerOptionsQueue.add(new MarkerOptions().draggable(true).title("Cat").alpha(0.8f).icon(BitmapDescriptorFactory.fromResource(R.drawable.hp_cat)));
 
+        CameraPosition lastCam = LocationUtil.loadCameraPosition(KEY_CAM, getActivity());
+        if (lastCam!=null) {
+            mCameraPosition = lastCam;
+        }
+        mMap.animateCamera(CameraUpdateFactory.newCameraPosition(lastCam));
     }
 
 
@@ -420,10 +432,6 @@ GoogleMap.OnCameraChangeListener {
         Log.d("UberMap", "you=" + mCurrentLocation);
 
         mCameraPosition = cameraPosition;
-
-        Log.d("UberMap", "Zoom Level = "+mCameraPosition.zoom);
-
-        // cameraPosition.zoom;
 
         if (mCurrentLocation!=null) {
 /*

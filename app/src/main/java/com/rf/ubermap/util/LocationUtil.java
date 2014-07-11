@@ -1,5 +1,12 @@
 package com.rf.ubermap.util;
 
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.preference.PreferenceManager;
+
+import com.google.android.gms.maps.model.CameraPosition;
+import com.google.android.gms.maps.model.LatLng;
+
 /**
  * Created by roberto on 7/8/14.
  */
@@ -16,6 +23,33 @@ public class LocationUtil {
         double dist = (earthRadius * c);
 
         return dist;
+    }
+
+
+    public static void saveCameraPosition(String key, CameraPosition cam, Context ctx) {
+        if(key==null || cam == null) {
+            return;
+        }
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(ctx);
+        SharedPreferences.Editor edit = prefs.edit();
+
+        // TODO fix possible precision loss
+        edit.putFloat(key + ".lat", (float) cam.target.latitude);
+        edit.putFloat(key + ".lon", (float) cam.target.longitude);
+        edit.putFloat(key + ".zoom", cam.zoom);
+        // more? tilt and stuff?
+
+        edit.commit();
+    }
+
+    public static CameraPosition loadCameraPosition(String key, Context ctx) {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(ctx);
+        float lat = prefs.getFloat(key+".lat", 0f);
+        float lon = prefs.getFloat(key+".lon", 0f);
+        float zoom = prefs.getFloat(key+".zoom", 0f);
+
+        return CameraPosition.fromLatLngZoom(new LatLng(lat,lon), zoom);
+
     }
 
 }
