@@ -67,6 +67,12 @@ import retrofit.client.Response;
  * https://developers.google.com/maps/showcase/#mobile
  *
  * Shazam Explore
+ *
+ *
+ * Muni, SF bus locations, ping every 10 seconds.
+ *
+ *
+ * https://developers.google.com/maps/documentation/android/utility/
  */
 
 public class MapFragment extends Fragment implements 
@@ -320,8 +326,8 @@ GoogleMap.OnCameraChangeListener {
         mMap.setOnCameraChangeListener(this);
         mMap.setMyLocationEnabled(true);
         mMap.getUiSettings().setCompassEnabled(false);
-        mMap.getUiSettings().setRotateGesturesEnabled(false);
-        mMap.getUiSettings().setTiltGesturesEnabled(false);
+       // -- mMap.getUiSettings().setRotateGesturesEnabled(false);
+       //--  mMap.getUiSettings().setTiltGesturesEnabled(false);
 
         mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
             @Override
