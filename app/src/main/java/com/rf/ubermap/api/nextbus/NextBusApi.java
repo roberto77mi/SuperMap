@@ -1,4 +1,4 @@
-package com.rf.ubermap.api;
+package com.rf.ubermap.api.nextbus;
 
 import com.rf.ubermap.api.nextbus.VehiclesResponse;
 

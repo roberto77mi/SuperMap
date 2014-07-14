@@ -51,7 +51,7 @@ public class MainActivity extends Activity
 //        FragmentManager fragmentManager = getFragmentManager();
 //        fragmentManager.beginTransaction().add(R.id.container,mMapFragment).commit();
 
-        // Set up the drawer.
+        // Set up the drawer
         mNavigationDrawerFragment.setUp(
                 R.id.navigation_drawer,
                 (DrawerLayout) findViewById(R.id.drawer_layout));

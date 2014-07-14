@@ -114,7 +114,13 @@ GoogleMap.OnCameraChangeListener {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+
+        Log.i("UberMap", "--------------------------------- map fragment created");
+
+        //setRetainInstance(true);
+
         super.onCreate(savedInstanceState);
+
         mMarkersQueue = new LinkedList<Marker>();
         mMarkerOptionsQueue = new LinkedList<MarkerOptions>();
 
@@ -124,11 +130,15 @@ GoogleMap.OnCameraChangeListener {
                 .build();
 
         mOpenMapQuestApi = mMapQuestAdapter.create(OpenMapQuest.class);
+
+
     }
 
     @Override
 	public View onCreateView(LayoutInflater inflater, ViewGroup container,
 			Bundle savedInstanceState) {
+        Log.i("UberMap", "--------------------------------- map CreateView");
+
 		View rootView = inflater.inflate(R.layout.fragment_map,
 				container, false);
 
@@ -149,7 +159,9 @@ GoogleMap.OnCameraChangeListener {
 
         mBearingImageView.animate().rotation(360).setStartDelay(1000).setDuration(1000).start();
 
+
         mMapView = (MapView) rootView.findViewById(R.id.mapView);
+
         setUpMapIfNeeded();
 
 		return rootView;
@@ -174,7 +186,7 @@ GoogleMap.OnCameraChangeListener {
 
     @Override
     public void onSaveInstanceState(Bundle outState) {
-        super.onSaveInstanceState(outState);
+
 
         if (mMap!=null) {
             CameraPosition camPos = mMap.getCameraPosition();
@@ -186,6 +198,7 @@ GoogleMap.OnCameraChangeListener {
 
         mMapView.onSaveInstanceState(outState);
 
+        super.onSaveInstanceState(outState);
     }
 
 
@@ -214,11 +227,7 @@ GoogleMap.OnCameraChangeListener {
     @Override
     public void onPause() {
         super.onPause();
-
-
         mMapView.onPause();
-
-
     }
 
     @Override
@@ -306,9 +315,6 @@ GoogleMap.OnCameraChangeListener {
                 setUpMap();
             }
         }
-
-
-
         if (mMap!=null) {
             CameraPosition camPos = mMap.getCameraPosition();
             Log.d("UberMap", "pos=" + camPos);
@@ -316,10 +322,12 @@ GoogleMap.OnCameraChangeListener {
         } else {
             Log.d("UberMap", "NULL GoogleMap");
         }
-
     }
 
     private void setUpMap() {
+
+        Log.i("UberMap"," ------------------------ setUpMap()");
+
         MapsInitializer.initialize(getActivity().getApplicationContext());
 
       //  mMap.addMarker(new MarkerOptions().position(new LatLng(0, 0)).title("Marker"));
@@ -389,11 +397,13 @@ GoogleMap.OnCameraChangeListener {
 
         mMarkerOptionsQueue.add(new MarkerOptions().draggable(true).title("Cat").alpha(0.8f).icon(BitmapDescriptorFactory.fromResource(R.drawable.hp_cat)));
 
+
         CameraPosition lastCam = LocationUtil.loadCameraPosition(KEY_CAM, getActivity());
         if (lastCam!=null) {
             mCameraPosition = lastCam;
         }
         mMap.animateCamera(CameraUpdateFactory.newCameraPosition(lastCam));
+
     }
 
 

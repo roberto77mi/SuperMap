@@ -22,4 +22,9 @@
     <string name="hello_world">Hello world!</string>
     <string name="title_activity_settings">SettingsActivity</string>
 
+    <string name="dialog_welcome">Welcome to San Francisco.\n\nReady to see Muni vehicles moving?</string>
+    <string name="dialog_ok">Ok</string>
+    <string name="dialog_cancel">Cancel</string>
+
+    <string name="action_refresh">Refresh</string>
 </resources>
