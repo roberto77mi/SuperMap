@@ -63,16 +63,26 @@ public class MainActivity extends Activity
         FragmentManager fragmentManager = getFragmentManager();
 
         switch (position) {
-
-            case 0: // About
+            case 0:
+                fragmentManager.beginTransaction()
+                        .replace(R.id.container, new SanFranciscoMapFragment())
+                        .commit();
+                break;
+            case 1:
+                fragmentManager.beginTransaction()
+                        .replace(R.id.container, new MapFragment())
+                        .commit();
+                break;
+            case 2: // About
                 startActivity(new Intent(this, AboutActivity.class));
                 break;
-            case 1: // Settings
+            case 3: // Settings
                 /*
                 fragmentManager.beginTransaction()
                         .replace(R.id.container, new AboutFragment())
                         .commit();
                 */
+
                 startActivity(new Intent(this, SettingsActivity.class));
 
                 break;
@@ -82,10 +92,16 @@ public class MainActivity extends Activity
     public void onSectionAttached(int number) {
         // on changing Fragment, currently not used because navigation is opening new activities
         switch (number) {
-            case 1:
+            case 0:
                 mTitle = getString(R.string.title_section_about);
                 break;
+            case 1:
+                mTitle = getString(R.string.title_section_settings);
+                break;
             case 2:
+                mTitle = getString(R.string.title_section_about);
+                break;
+            case 3:
                 mTitle = getString(R.string.title_section_settings);
                 break;
            // case 3:
@@ -128,6 +144,22 @@ public class MainActivity extends Activity
     }
 
     /**
+     *
+     *
+     *
+     *
+     *
+     *
+     * this is not used
+     *
+     *
+     *
+     *
+     *
+     *
+     *
+     *
+     *
      * A placeholder fragment containing a simple view.
      */
     public static class PlaceholderFragment extends Fragment {

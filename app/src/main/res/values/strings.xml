@@ -27,4 +27,6 @@
     <string name="dialog_cancel">Cancel</string>
 
     <string name="action_refresh">Refresh</string>
+    <string name="title_section_four_characters_map"><![CDATA[Boy & Girl Map]]></string>
+    <string name="title_section_sf_map">San Francisco Map</string>
 </resources>

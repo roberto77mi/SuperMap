@@ -9,12 +9,13 @@
 
     <!-- As the main content view, the view below consumes the entire
          space available using match_parent in both dimensions. -->
-   <!--
+
+
     <FrameLayout
         android:id="@+id/container"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
-    -->
+
 
     <!--
               <fragment
@@ -29,13 +30,13 @@
                 android:layout_height="match_parent"
                 android:name="com.rf.ubermap.MapFragment"/>
     -->
-
+<!--
     <fragment
         android:id="@+id/main_fragment_2"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:name="com.rf.ubermap.SanFranciscoMapFragment"/>
-
+-->
     <!--
     <TextView
         android:layout_width="wrap_content"
