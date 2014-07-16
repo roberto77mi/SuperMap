@@ -1,10 +1,13 @@
 package com.rf.ubermap.api.nextbus;
 
+import com.google.android.gms.maps.model.LatLng;
+import com.google.maps.android.clustering.ClusterItem;
+
 import org.simpleframework.xml.Attribute;
 import org.simpleframework.xml.Root;
 
 @Root
-public class Vehicle {
+public class Vehicle implements ClusterItem {
 
     @Attribute
     public long id;
@@ -35,6 +38,11 @@ public class Vehicle {
 
     @Attribute(required = false)
     public long leadingVehicleId;
+
+    @Override
+    public LatLng getPosition() {
+        return new LatLng(lat,lon);
+    }
 
     @Override
     public String toString() {
