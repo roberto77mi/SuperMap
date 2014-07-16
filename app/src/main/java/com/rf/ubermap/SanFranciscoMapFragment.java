@@ -8,6 +8,7 @@ import android.app.Dialog;
 import android.app.DialogFragment;
 import android.app.Fragment;
 import android.content.DialogInterface;
+import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
@@ -30,6 +31,8 @@ import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.VisibleRegion;
+import com.google.maps.android.ui.IconGenerator;
 import com.rf.ubermap.api.nextbus.NextBusApi;
 import com.rf.ubermap.api.nextbus.Vehicle;
 import com.rf.ubermap.api.nextbus.VehiclesResponse;
@@ -46,26 +49,32 @@ import retrofit.client.Response;
 import retrofit.converter.SimpleXmlConverter;
 
 /**
- * - start the map on SF view
+ * - DONE start the map on SF view
  *
- * - show all the muni vehicles
+ * - DONE show all the muni vehicles
  * - update the vehicles every X seconds (10?)
  *
+ * FROM https://github.com/googlemaps/android-maps-utils
+ * - IconGenerator: use bubble icon factory to show vehicles labels
+ * - Marker clustering  https://developers.google.com/maps/documentation/android/utility/marker-clustering?hl=pt-PT
+ * - Heat maps
+ *
  * - try to animate
+ *
  * - calculate some fun stats about
  *
  * - use the Geocoding Api to the the neighbourhood of each vehicle
+ *
  * - create fun stuff about density and average direction for SF and each neighbourhood
  *
- * - record my position, tell a story; activity recognition api, mark how you are moving.
+ * - record my position, tell a story; activity recognition api, mark how you are moving
  *
- * See: https://github.com/googlemaps/hellomap-android
  *
  *
  * - APIs (Google) Places API, Directions API
  *
  *
- * --------> use bubble icon factory to show vehicles labels
+ * -------->
  *
  */
 public class SanFranciscoMapFragment extends Fragment {
@@ -81,6 +90,9 @@ public class SanFranciscoMapFragment extends Fragment {
     final static LatLng SAN_FRANCISCO = new LatLng(37.7545458, -122.4408335);
     final static CameraPosition mCameraSanFrancisco = CameraPosition.fromLatLngZoom(SAN_FRANCISCO, 9f);
     final static float SAN_FRANCISCO_DEFAULT_ZOOM = 11.5f;
+    final static float SAN_FRANCISCO_ZOOM_ANIMATION = 13f;
+
+    HashMap<String, LatLng> SF_COOL_SPOTS = new HashMap<String, LatLng>();
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -99,7 +111,15 @@ public class SanFranciscoMapFragment extends Fragment {
 
         mVehiclesMap = new HashMap<Long, Marker>();
         mMarkerVehicleMap = new HashMap<Marker, Vehicle>();
+
+
+        SF_COOL_SPOTS.put("Civic Center", new LatLng(37.7778533,-122.4178577));
+        SF_COOL_SPOTS.put("Pier 39", new LatLng(37.808673,-122.409821));
+        SF_COOL_SPOTS.put("Twin Peaks", new LatLng(37.7532511,-122.4512832));
+        SF_COOL_SPOTS.put("Ferry Building", new LatLng(37.795274,-122.393155));
+
     }
+
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -204,9 +224,44 @@ public class SanFranciscoMapFragment extends Fragment {
             }
         });
 
+        mMap.setOnCameraChangeListener(new GoogleMap.OnCameraChangeListener() {
+            @Override
+            public void onCameraChange(CameraPosition cameraPosition) {
+                Log.i("UberMap","Zoom="+cameraPosition.zoom);
+
+                if (cameraPosition.zoom < SAN_FRANCISCO_ZOOM_ANIMATION) return;
+
+                VisibleRegion region = mMap.getProjection().getVisibleRegion();
+                int count = 0;
+                for (Marker marker : mMarkerVehicleMap.keySet()){
+
+                    if (region.latLngBounds.contains(marker.getPosition())){
+                        Log.i("UberMap","["+marker.getTitle()+"] is in this region.");
+                        count++;
+                    }
+
+                }
+                Log.i("UberMap","Total vehicles here : "+count );
+
+            }
+        });
+
+        addFixedMarkers();
+
         loadVehicles();
+
+
     }
 
+    private void addFixedMarkers() {
+        IconGenerator tc = new IconGenerator(getActivity());
+
+        for (String name : SF_COOL_SPOTS.keySet()) {
+            Bitmap bmp = tc.makeIcon(name);
+            mMap.addMarker(new MarkerOptions().position(SF_COOL_SPOTS.get(name)).icon(BitmapDescriptorFactory.fromBitmap(bmp)));
+        }
+
+    }
 
 
     private void loadVehicles() {
@@ -256,29 +311,30 @@ public class SanFranciscoMapFragment extends Fragment {
 
 
     private void showVehicles(List<Vehicle> vehicles){
-
         for (Vehicle vehicle : vehicles) {
             if (vehicle==null || vehicle.lat==0 || vehicle.routeTag==null) {
                 Log.w("UberMap","skipping vehicle");
                 continue;
             }
 
-            // if (vehicle.speedKmHr<30) continue; for testing, limit to fast vehicles
+            // if (vehicle.speedKmHr<30) continue;// for testing, limit to fast vehicles
 
             boolean alphabetic = !Character.isDigit(vehicle.routeTag.charAt(0));
             boolean stopped = vehicle.speedKmHr == 0;
 
             Marker vehicleMarker = mVehiclesMap.get(vehicle.id);
 
-            // mMap.getCameraPosition().
 
             if (vehicleMarker==null) {
+
                 // create new Marker
                 vehicleMarker = mMap.addMarker(new MarkerOptions().position(new LatLng(vehicle.lat, vehicle.lon))
                         .draggable(false).title(vehicle.routeTag)
                         .flat(true)
                         .rotation(vehicle.heading - 90)
                         .alpha(vehicle.secsSinceReport > 120 ? 0.5f : vehicle.secsSinceReport > 60 ? 0.8f : 1)
+                        //.icon(BitmapDescriptorFactory.fromBitmap(bmp))
+
                         .icon(
                                 stopped ? (
                                         alphabetic ? BitmapDescriptorFactory.fromResource(R.drawable.orange_dot) :
@@ -288,7 +344,9 @@ public class SanFranciscoMapFragment extends Fragment {
                                                 alphabetic ? BitmapDescriptorFactory.fromResource(R.drawable.orange_tringle) :
                                                         BitmapDescriptorFactory.fromResource(R.drawable.blue_triangle)
                                         )
-                        ));
+                        )
+
+                );
 
                 mVehiclesMap.put(vehicle.id, vehicleMarker);
                 mMarkerVehicleMap.put(vehicleMarker, vehicle);
@@ -302,6 +360,8 @@ public class SanFranciscoMapFragment extends Fragment {
 
                 Log.d("UberMap","Moving Vehicle '"+vehicle.routeTag+"'");
             }
+
+            //startAnimate(vehicleMarker);
         }
 
         if (mRefreshMenu!=null) mRefreshMenu.setEnabled(true);
@@ -312,12 +372,12 @@ public class SanFranciscoMapFragment extends Fragment {
        Vehicle vehicle = mMarkerVehicleMap.get(marker);
        if (vehicle!=null) {
 
-           Toast.makeText(getActivity(), "animating "+vehicle.routeTag+" speed:"+vehicle.speedKmHr, Toast.LENGTH_SHORT).show();
+           // Toast.makeText(getActivity(), "animating "+vehicle.routeTag+" speed:"+vehicle.speedKmHr, Toast.LENGTH_SHORT).show();
            //
 
            LatLng startPosition = marker.getPosition();
 
-           LatLng finalPosition = LocationUtil.move(startPosition, vehicle.heading, vehicle.speedKmHr*10/36, ANIMATION_MILLIS);
+           LatLng finalPosition = LocationUtil.move(startPosition, vehicle.heading, ANIMATION_SPEED_MULTIPLIER * vehicle.speedKmHr*10/36, ANIMATION_MILLIS);
 
            //startPosition
 
@@ -344,8 +404,10 @@ public class SanFranciscoMapFragment extends Fragment {
 
         animator.setDuration(ANIMATION_MILLIS);
         animator.start();
+
+        Log.d("UberMap","Start on "+marker.getTitle());
     }
 
-    final static long ANIMATION_MILLIS = 10000;
-
+    final static long ANIMATION_MILLIS = 20000;
+    final static long ANIMATION_SPEED_MULTIPLIER = 20; // for testing, otherwise use 1
 }

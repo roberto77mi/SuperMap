@@ -93,10 +93,10 @@ public class MainActivity extends Activity
         // on changing Fragment, currently not used because navigation is opening new activities
         switch (number) {
             case 0:
-                mTitle = getString(R.string.title_section_about);
+                mTitle = getString(R.string.title_section_sf_map);
                 break;
             case 1:
-                mTitle = getString(R.string.title_section_settings);
+                mTitle = getString(R.string.title_section_four_characters_map);
                 break;
             case 2:
                 mTitle = getString(R.string.title_section_about);
