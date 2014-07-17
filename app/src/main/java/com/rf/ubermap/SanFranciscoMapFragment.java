@@ -406,6 +406,7 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
         nextBusApi.getVehiclesPositions("sf-muni", new Callback<VehiclesResponse>() {
             @Override
             public void success(VehiclesResponse vehiclesResponse, Response response) {
+                if (!isAdded()) return;
 
                 Log.d("UberMap", vehiclesResponse.getList().size() + " vehicles: " + vehiclesResponse);
                 mVehicles = vehiclesResponse.getList();
@@ -431,6 +432,8 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
             @Override
             public void failure(RetrofitError retrofitError) {
                 Log.d("UberMap", "Error Bus " + retrofitError);
+                if (!isAdded()) return;
+
                 mHeaderText.setText(R.string.sf_api_fail);
 
                 mLoading = false;
@@ -517,22 +520,27 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
                 vehicleMarker.setVisible(true);
 
 
+                if (vehicle.secsSinceReport<mRefreshInterval/1000) {
+                    Log.d("UberMap","Moving Vehicle '"+vehicle.routeTag+"'. Last Reported Position "+vehicle.secsSinceReport+" seconds ago.");
 
-                // move vehicles
-                vehicleMarker.setPosition(new LatLng(vehicle.lat, vehicle.lon));
-                vehicleMarker.setRotation(vehicle.heading - 90); // TODO animate this
-                vehicleMarker.setAlpha(vehicle.secsSinceReport > 120 ? 0.5f : vehicle.secsSinceReport > 60 ? 0.8f : 1);
-                // also change
-                ObjectAnimator oAnin = mAnimations.remove(vehicleMarker);
-                if (oAnin!=null) {
-                    oAnin.cancel();
+                    ObjectAnimator oAnin = mAnimations.remove(vehicleMarker);
+                    if (oAnin != null) {
+                        oAnin.cancel();
+                    }
+
+                    // move vehicles
+                    vehicleMarker.setPosition(new LatLng(vehicle.lat, vehicle.lon));
+                    vehicleMarker.setRotation(vehicle.heading - 90); // TODO animate this
+                    vehicleMarker.setAlpha(vehicle.secsSinceReport > 120 ? 0.5f : vehicle.secsSinceReport > 60 ? 0.8f : 1);
+
+                    //animateMarkerToICS(vehicleMarker, new LatLng(vehicle.lat, vehicle.lon), LINEAR, 300);
+                } else {
+                    Log.d("UberMap","No update for Vehicle '"+vehicle.routeTag+"'. Last Reported Position "+vehicle.secsSinceReport+" seconds ago.");
                 }
-                // TODO makes markers jump, not sure why
-                //animateMarkerToICS(vehicleMarker, new LatLng(vehicle.lat, vehicle.lon), LINEAR, 300);
 
                 mMarkerVehicleMap.put(vehicleMarker, vehicle); // update data, like speed
 
-                Log.d("UberMap","Moving Vehicle '"+vehicle.routeTag+"'");
+
             }
 
             //startAnimate(vehicleMarker);

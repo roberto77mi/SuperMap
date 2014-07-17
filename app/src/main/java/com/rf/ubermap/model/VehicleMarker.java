@@ -20,7 +20,7 @@ public class VehicleMarker {
     // this position does not change while the Marker is animated
     public LatLng lastReportedPosition;
 
-    public void setAlpha(){
+    public void setAlpha(int secondsSince){
 
     }
 }
