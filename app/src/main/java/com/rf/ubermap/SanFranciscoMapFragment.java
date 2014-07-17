@@ -14,6 +14,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.os.SystemClock;
 import android.preference.PreferenceManager;
 import android.util.Log;
 import android.util.Property;
@@ -275,6 +276,7 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
             }
         });
 
+        /*
         mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
             @Override
             public boolean onMarkerClick(Marker marker) {
@@ -282,6 +284,7 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
                 return false;
             }
         });
+        */
 
         mMap.setOnCameraChangeListener(new GoogleMap.OnCameraChangeListener() {
             @Override
@@ -304,23 +307,37 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
 
     }
 
-    private void possiblyAnimateAll() {
+    private void possiblyAnimateAll(final long inMillis) {
         if (mMap.getCameraPosition().zoom > SAN_FRANCISCO_ZOOM_ANIMATION) {
 
             setRefreshInterval(REFRESH_SLOW);
 
-            VisibleRegion region = mMap.getProjection().getVisibleRegion();
-            int count = 0;
-            for (Marker marker : mMarkerVehicleMap.keySet()){
+            mMainThreadHandler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    final VisibleRegion region = mMap.getProjection().getVisibleRegion(); // UI Thread
 
-                if (region.latLngBounds.contains(marker.getPosition())){
-                    Log.i("UberMap","["+marker.getTitle()+"] is in this region.");
-                    startAnimate(marker);
-                    count++;
+                    int count = 0;
+                    for (Marker marker : mMarkerVehicleMap.keySet()){
+
+                        if (region.latLngBounds.contains(marker.getPosition())){
+                            Log.i("UberMap","["+marker.getTitle()+"] is in this region.");
+                            startAnimate(marker);
+                            count++;
+                        }
+
+                    }
+                    Log.i("UberMap","Total vehicles here : "+count );
                 }
+            }, inMillis);
 
-            }
-            Log.i("UberMap","Total vehicles here : "+count );
+
+
+
+
+
+
+
         } else {
             // far away, let the animation finish and reload stuff in 60 seconds
             setRefreshInterval(REFRESH_SLOW);
@@ -496,6 +513,7 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
                         .draggable(false).title(vehicle.routeTag)
                         .flat(true)
                         .rotation(vehicle.heading - 90)
+                        .snippet(vehicle.routeTag+", "+vehicle.speedKmHr+"km/h")
                         .alpha(vehicle.secsSinceReport > 120 ? 0.5f : vehicle.secsSinceReport > 60 ? 0.8f : 1)
                         //.icon(BitmapDescriptorFactory.fromBitmap(bmp))
 
@@ -529,13 +547,18 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
                     }
 
                     // move vehicles
-                    vehicleMarker.setPosition(new LatLng(vehicle.lat, vehicle.lon));
+                  //  vehicleMarker.setPosition(new LatLng(vehicle.lat, vehicle.lon));
                     vehicleMarker.setRotation(vehicle.heading - 90); // TODO animate this
                     vehicleMarker.setAlpha(vehicle.secsSinceReport > 120 ? 0.5f : vehicle.secsSinceReport > 60 ? 0.8f : 1);
+                    vehicleMarker.setSnippet(vehicle.routeTag+", "+vehicle.speedKmHr+"km/h");
 
-                    //animateMarkerToICS(vehicleMarker, new LatLng(vehicle.lat, vehicle.lon), LINEAR, 300);
+                    animateMarkerToICS(vehicleMarker, new LatLng(vehicle.lat, vehicle.lon), LINEAR, 500);
                 } else {
-                    Log.d("UberMap","No update for Vehicle '"+vehicle.routeTag+"'. Last Reported Position "+vehicle.secsSinceReport+" seconds ago.");
+
+                    // the vehicle is moving by the animation, so I don't want to put it back where it was
+                    Log.d("UberMap","No update for Vehicle '"+vehicle.routeTag+"'. Old ["+vehicleMarker.getPosition()+"] new ["+vehicle.lat+","+vehicle.lon+"] Last Reported Position "+vehicle.secsSinceReport+" seconds ago.");
+
+
                 }
 
                 mMarkerVehicleMap.put(vehicleMarker, vehicle); // update data, like speed
@@ -546,7 +569,7 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
             //startAnimate(vehicleMarker);
         }
 
-        possiblyAnimateAll();
+        possiblyAnimateAll(500); // waits 500 for the animation to correct the position to finish
 
         if (mRefreshMenu!=null) mRefreshMenu.setEnabled(true);
     }
@@ -582,20 +605,17 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
 
 
 
-    private void startAnimate(Marker marker) {
+    private void startAnimate(final Marker marker) {
        Vehicle vehicle = mMarkerVehicleMap.get(marker);
        if (vehicle!=null && vehicle.speedKmHr>0) {
 
-           // Toast.makeText(getActivity(), "animating "+vehicle.routeTag+" speed:"+vehicle.speedKmHr, Toast.LENGTH_SHORT).show();
-           //
+           final LatLng startPosition = marker.getPosition();
 
-           LatLng startPosition = marker.getPosition();
-
-           LatLng finalPosition = LocationUtil.move(startPosition, vehicle.heading, ANIMATION_SPEED_MULTIPLIER * vehicle.speedKmHr*10/36, mRefreshInterval);
+           final LatLng finalPosition = LocationUtil.move(startPosition, vehicle.heading, ANIMATION_SPEED_MULTIPLIER * vehicle.speedKmHr*10/36, mRefreshInterval);
 
            //startPosition
-
            animateMarkerToICS(marker, finalPosition, LINEAR, mRefreshInterval);
+
 
        } else {
            Log.w("UberMap", "Dunno this vehicle, dude.");
@@ -604,7 +624,7 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
     }
 
 
-
+    // needs to be called by the UI Thread
     @TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
     void animateMarkerToICS(Marker marker, LatLng finalPosition, final LatLngInterpolator latLngInterpolator,long time) {
 
@@ -623,6 +643,7 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
         animator.setInterpolator(new LinearInterpolator());
 
         animator.setDuration(time);
+        // animator.setStartDelay(500);
         animator.start();
 
         mAnimations.put(marker, animator);
