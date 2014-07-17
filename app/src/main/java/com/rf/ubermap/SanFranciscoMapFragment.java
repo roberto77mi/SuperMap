@@ -346,7 +346,7 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
         private void possiblyAnimateAll(final long inMillis) {
         if (mMap.getCameraPosition().zoom > SAN_FRANCISCO_ZOOM_ANIMATION) {
 
-            setRefreshInterval(REFRESH_SLOW);
+            setRefreshInterval(REFRESH_FAST);
 
             mMainThreadHandler.postDelayed(new Runnable() {
                 @Override
