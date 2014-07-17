@@ -3,6 +3,7 @@ package com.rf.ubermap.util;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
+import android.util.Log;
 
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
@@ -28,6 +29,8 @@ public class LocationUtil {
     public static LatLng move(LatLng startPosition, float bearing, float speedMetersSeconds, float timeMillis) {
 
         double distanceMeters = speedMetersSeconds + timeMillis/1000d;
+
+        Log.d("UberMap", "Moving by "+distanceMeters+" in "+timeMillis+" millis");
 
         return _move(startPosition.latitude,startPosition.longitude,bearing,distanceMeters);
 

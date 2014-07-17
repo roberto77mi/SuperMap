@@ -6,13 +6,15 @@ This is a sample app to showcase many aspects of Android Location Service and Go
 
 UI & Android SDK
 - Drawer with Fragments (one for each Map Project) and activities (for About and Settings)
-- Settings Fragment
+- Settings Fragment and registerOnSharedPreferenceChangeListener (can probably be done with Otto)
 - Google Maps fragments
 - Markers, add move animate
 - Save Camera Position in Prefs
 - Async Reverse Geocoding when the marker is dropped (with Retrofit)
 - On Camera change, rotate bearing, calculate distance
 - Location API, get your location, register for update (in progress)
+
+
 
 API
 - OpenMapQuest => Reverse Geocoding, gives name of place from coordinates
@@ -29,7 +31,8 @@ LIBS
 
 
 
-
+KNOWN ISSUES
+- About and Prefs in side drawers should not be highlighted when the have been closed
 
 
 

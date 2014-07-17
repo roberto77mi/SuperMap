@@ -15,4 +15,17 @@
         android:entryValues="@array/pref_debug_levels_values"
         android:defaultValue="@string/pref_debug_level_default" />
 
+    <PreferenceCategory android:title="@string/pref_sf_map_category">
+
+        <CheckBoxPreference android:key="pref_sf_landmarks"
+            android:title="@string/pref_sf_landmarks"
+            android:defaultValue="false"/>
+
+        <CheckBoxPreference android:key="pref_sf_cluster"
+            android:title="@string/pref_sf_clusters"
+            android:defaultValue="false"/>
+
+
+    </PreferenceCategory>
+
 </PreferenceScreen>

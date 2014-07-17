@@ -29,4 +29,11 @@
     <string name="action_refresh">Refresh</string>
     <string name="title_section_four_characters_map"><![CDATA[Boy & Girl Map]]></string>
     <string name="title_section_sf_map">San Francisco Map</string>
+    <string name="pref_sf_clusters">Cluster Vehicles</string>
+    <string name="pref_sf_landmarks">Show Landmarks</string>
+    <string name="pref_sf_map_category">San Francisco Map</string>
+    <string name="sf_api_fail">Error Loading Data</string>
+    <string name="sf_vehicles">vehicles</string>
+    <string name="sf_loading">loading...</string>
+
 </resources>

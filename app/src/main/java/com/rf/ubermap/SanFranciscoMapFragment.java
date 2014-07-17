@@ -8,9 +8,13 @@ import android.app.Dialog;
 import android.app.DialogFragment;
 import android.app.Fragment;
 import android.content.DialogInterface;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
+import android.preference.PreferenceManager;
 import android.util.Log;
 import android.util.Property;
 import android.view.LayoutInflater;
@@ -19,7 +23,9 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.Animation;
 import android.view.animation.LinearInterpolator;
+import android.widget.TextView;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
@@ -42,6 +48,7 @@ import com.rf.ubermap.util.LocationUtil;
 
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 
 import retrofit.Callback;
@@ -61,9 +68,12 @@ import retrofit.converter.SimpleXmlConverter;
  * - Marker clustering  https://developers.google.com/maps/documentation/android/utility/marker-clustering?hl=pt-PT
  * - Heat maps
  *
+ * - show Neighborhoods / cluster by Neighborhood when zoomed out.
+ *   http://www.zillow.com/howto/api/neighborhood-boundaries.htm  |  http://en.wikipedia.org/wiki/Shapefile
+ *
  * - try to animate
  *
- * - calculate some fun stats about
+ * - calculate some fun stats about density, direction, neighborhood, distances, etc
  *
  * - use the Geocoding Api to the the neighbourhood of each vehicle
  *
@@ -79,7 +89,7 @@ import retrofit.converter.SimpleXmlConverter;
  * -------->
  *
  */
-public class SanFranciscoMapFragment extends Fragment {
+public class SanFranciscoMapFragment extends Fragment implements Handler.Callback {
 
     NextBusApi nextBusApi;
     MapView mMapView;
@@ -88,6 +98,7 @@ public class SanFranciscoMapFragment extends Fragment {
     private HashMap<Long, Marker> mVehiclesMap;
     private HashMap<Marker, Vehicle> mMarkerVehicleMap;
     private List<Vehicle> mVehicles;
+    SharedPreferences.OnSharedPreferenceChangeListener mPrefListener;
 
     private MenuItem mRefreshMenu;
 
@@ -96,12 +107,23 @@ public class SanFranciscoMapFragment extends Fragment {
     final static float SAN_FRANCISCO_DEFAULT_ZOOM = 11.5f;
     final static float SAN_FRANCISCO_ZOOM_ANIMATION = 13f;
     final static float SF_CLUSTER_ZOOM = 12;
+    final static int WHAT_REFRESH = 1;
+    final static LatLngInterpolator LINEAR = new LatLngInterpolator.Linear();
 
     HashMap<String, LatLng> SF_LANDMARKS = new HashMap<String, LatLng>();
-
+    HashSet<Marker> mLandmarksMarkers = new HashSet<Marker>();
+    HashMap<Marker, ObjectAnimator> mAnimations = new HashMap<Marker, ObjectAnimator>();
 
     private boolean mLoading = false;
     private boolean mShowClusters = false;
+
+    TextView mHeaderText;
+
+    Handler mMainThreadHandler;
+    long mRefreshInterval = REFRESH_SLOW; // millis
+    static final long REFRESH_FAST = 10000;
+    static final long REFRESH_SLOW = 30000;
+
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -115,6 +137,22 @@ public class SanFranciscoMapFragment extends Fragment {
                 .setConverter(new SimpleXmlConverter())
                 .build();
 
+        mPrefListener = new SharedPreferences.OnSharedPreferenceChangeListener() {
+
+            @Override
+            public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
+                Log.d("UberMap","Pref Changed ["+key+"]");
+                if ("pref_sf_landmarks".equals(key)) {
+                    showLandmarks(sharedPreferences.getBoolean(key,false));
+                } else if ("pref_sf_cluster".equals(key)){
+                    //showVehiclesOrClusters();
+                    setUpMap();
+                }
+            }
+
+        };
+
+        PreferenceManager.getDefaultSharedPreferences(getActivity()).registerOnSharedPreferenceChangeListener(mPrefListener);
 
         nextBusApi = restAdapter.create(NextBusApi.class);
 
@@ -126,15 +164,28 @@ public class SanFranciscoMapFragment extends Fragment {
         SF_LANDMARKS.put("Twin Peaks", new LatLng(37.7532511, -122.4512832));
         SF_LANDMARKS.put("Ferry Building", new LatLng(37.795274, -122.393155));
 
+
+        mMainThreadHandler = new Handler(getActivity().getMainLooper(), this);
     }
 
+    @Override
+    public boolean handleMessage(Message msg) {
+        switch (msg.what) {
+            case WHAT_REFRESH:
+                loadVehicles();
+            break;
+        }
+
+        //msg.recycle();
+        return true;
+    }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View rootView = inflater.inflate(R.layout.fragment_map,
                 container, false);
         mMapView = (MapView) rootView.findViewById(R.id.mapView);
-
+        mHeaderText = (TextView) rootView.findViewById(R.id.map_location_text);
 
         setUpMapIfNeeded();
 
@@ -235,60 +286,78 @@ public class SanFranciscoMapFragment extends Fragment {
         mMap.setOnCameraChangeListener(new GoogleMap.OnCameraChangeListener() {
             @Override
             public void onCameraChange(CameraPosition cameraPosition) {
-
-                showVehiclesOrClusters();
-
                 Log.i("UberMap","Zoom="+cameraPosition.zoom);
-
-                if (cameraPosition.zoom < SAN_FRANCISCO_ZOOM_ANIMATION) return;
-
-                VisibleRegion region = mMap.getProjection().getVisibleRegion();
-                int count = 0;
-                for (Marker marker : mMarkerVehicleMap.keySet()){
-
-                    if (region.latLngBounds.contains(marker.getPosition())){
-                        Log.i("UberMap","["+marker.getTitle()+"] is in this region.");
-                        count++;
-                    }
-
-                }
-                Log.i("UberMap","Total vehicles here : "+count );
 
             }
         });
 
-        mClusterManager = new ClusterManager<Vehicle>(getActivity(), mMap);
-        mClusterManager.setRenderer(new VehicleClusterRenderer(getActivity(),mMap,mClusterManager));
+        if (mClusterManager==null) {
+            mClusterManager = new ClusterManager<Vehicle>(getActivity(), mMap);
+            mClusterManager.setRenderer(new VehicleClusterRenderer(getActivity(), mMap, mClusterManager));
+        }
 
-        // addFixedMarkers();
+        if (PreferenceManager.getDefaultSharedPreferences(getActivity()).getBoolean("pref_sf_landmarks",false)) {
+            showLandmarks(true);
+        }
 
         loadVehicles();
 
     }
 
+    private void possiblyAnimateAll() {
+        if (mMap.getCameraPosition().zoom > SAN_FRANCISCO_ZOOM_ANIMATION) {
+
+            setRefreshInterval(REFRESH_SLOW);
+
+            VisibleRegion region = mMap.getProjection().getVisibleRegion();
+            int count = 0;
+            for (Marker marker : mMarkerVehicleMap.keySet()){
+
+                if (region.latLngBounds.contains(marker.getPosition())){
+                    Log.i("UberMap","["+marker.getTitle()+"] is in this region.");
+                    startAnimate(marker);
+                    count++;
+                }
+
+            }
+            Log.i("UberMap","Total vehicles here : "+count );
+        } else {
+            // far away, let the animation finish and reload stuff in 60 seconds
+            setRefreshInterval(REFRESH_SLOW);
+
+        }
+    }
+
+    private void cancelCurrentAnimations() {
+        for (ObjectAnimator anim : mAnimations.values()) {
+            anim.cancel();
+        }
+        mAnimations.clear();
+    }
+
+    private void setRefreshInterval(long intervalMillis) {
+        if (intervalMillis!=mRefreshInterval) {
+            mRefreshInterval = intervalMillis;
+
+            // then, reschedule
+            mMainThreadHandler.removeMessages(WHAT_REFRESH);
+            mMainThreadHandler.sendEmptyMessageDelayed(WHAT_REFRESH, mRefreshInterval);
+        }
+
+    }
+
     private void showVehiclesOrClusters(){
 
-        if (mVehicles!=null && mMap!=null) showClusters(mVehicles);
+        boolean useClustersConfig = PreferenceManager.getDefaultSharedPreferences(getActivity()).getBoolean("pref_sf_cluster",false);
 
-        /**
-         *
-         *
-         *
-         * TODO
-         *
-         * change me!
-         *
-         * I think I can use
-         * Customize the marker clusters
-         * to automate:
-         * https://developers.google.com/maps/documentation/android/utility/marker-clustering?hl=pt-PT
-         *
-         *
-         *
-         *
-         *
-         */
+        if (useClustersConfig) {
+            mMap.setOnCameraChangeListener(mClusterManager);
+            mMap.setOnMarkerClickListener(mClusterManager);
 
+            if (mVehicles != null && mMap != null) showClusters(mVehicles);
+        } else {
+            showVehicles(mVehicles);
+        }
 /*
         if (mVehicles!=null && mMap!=null) {
             if (mMap.getCameraPosition().zoom < SF_CLUSTER_ZOOM) {
@@ -300,22 +369,37 @@ public class SanFranciscoMapFragment extends Fragment {
 */
     }
 
-    private void addFixedMarkers() {
-        IconGenerator tc = new IconGenerator(getActivity());
 
-        for (String name : SF_LANDMARKS.keySet()) {
-            Bitmap bmp = tc.makeIcon(name);
-            mMap.addMarker(new MarkerOptions().position(SF_LANDMARKS.get(name)).icon(BitmapDescriptorFactory.fromBitmap(bmp)));
+
+    private void showLandmarks(boolean visible) {
+
+        if (mLandmarksMarkers.isEmpty()) {
+            createLandmarksMarkers();
+        }
+
+        for (Marker m:mLandmarksMarkers) {
+            m.setVisible(visible);
         }
 
     }
 
+    private void createLandmarksMarkers() {
+        IconGenerator tc = new IconGenerator(getActivity());
+
+        for (String name : SF_LANDMARKS.keySet()) {
+            Bitmap bmp = tc.makeIcon(name);
+            mLandmarksMarkers.add(
+                    mMap.addMarker(new MarkerOptions().position(SF_LANDMARKS.get(name)).icon(BitmapDescriptorFactory.fromBitmap(bmp)))
+            );
+        }
+    }
 
 
     private synchronized void loadVehicles() {
         if (mLoading) return;
 
         mLoading = true;
+        mHeaderText.setText(R.string.sf_loading);
 
         if (mRefreshMenu!=null) mRefreshMenu.setEnabled(false);
 
@@ -326,14 +410,29 @@ public class SanFranciscoMapFragment extends Fragment {
                 Log.d("UberMap", vehiclesResponse.getList().size() + " vehicles: " + vehiclesResponse);
                 mVehicles = vehiclesResponse.getList();
 
+                mHeaderText.setText(mVehicles.size()+" "+getString(R.string.sf_vehicles));
+
                 showVehiclesOrClusters();
 
                 mLoading = false;
+
+                /*
+                mMainThreadHandler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        loadVehicles();
+                    }
+                }, mRefreshInterval);
+                */
+                mMainThreadHandler.sendEmptyMessageDelayed(WHAT_REFRESH, mRefreshInterval);
+
             }
 
             @Override
             public void failure(RetrofitError retrofitError) {
                 Log.d("UberMap", "Error Bus " + retrofitError);
+                mHeaderText.setText(R.string.sf_api_fail);
+
                 mLoading = false;
             }
         });
@@ -370,6 +469,9 @@ public class SanFranciscoMapFragment extends Fragment {
 
         mShowClusters = false;
         hideClusters();
+
+        cancelCurrentAnimations();
+        // expect jumps from animated position to the new current correct position. Best to fast animate them!
 
         for (Vehicle vehicle : vehicles) {
             if (vehicle==null || vehicle.lat==0 || vehicle.routeTag==null) {
@@ -414,8 +516,20 @@ public class SanFranciscoMapFragment extends Fragment {
             } else {
                 vehicleMarker.setVisible(true);
 
+
+
                 // move vehicles
                 vehicleMarker.setPosition(new LatLng(vehicle.lat, vehicle.lon));
+                vehicleMarker.setRotation(vehicle.heading - 90); // TODO animate this
+                vehicleMarker.setAlpha(vehicle.secsSinceReport > 120 ? 0.5f : vehicle.secsSinceReport > 60 ? 0.8f : 1);
+                // also change
+                ObjectAnimator oAnin = mAnimations.remove(vehicleMarker);
+                if (oAnin!=null) {
+                    oAnin.cancel();
+                }
+                // TODO makes markers jump, not sure why
+                //animateMarkerToICS(vehicleMarker, new LatLng(vehicle.lat, vehicle.lon), LINEAR, 300);
+
                 mMarkerVehicleMap.put(vehicleMarker, vehicle); // update data, like speed
 
                 Log.d("UberMap","Moving Vehicle '"+vehicle.routeTag+"'");
@@ -424,12 +538,16 @@ public class SanFranciscoMapFragment extends Fragment {
             //startAnimate(vehicleMarker);
         }
 
+        possiblyAnimateAll();
+
         if (mRefreshMenu!=null) mRefreshMenu.setEnabled(true);
     }
 
     private boolean mClusterHasItems = false;
     private void hideClusters(){
         mClusterManager.clearItems();
+        mClusterManager.cluster();
+
         mClusterHasItems = false;
     }
 
@@ -458,18 +576,18 @@ public class SanFranciscoMapFragment extends Fragment {
 
     private void startAnimate(Marker marker) {
        Vehicle vehicle = mMarkerVehicleMap.get(marker);
-       if (vehicle!=null) {
+       if (vehicle!=null && vehicle.speedKmHr>0) {
 
            // Toast.makeText(getActivity(), "animating "+vehicle.routeTag+" speed:"+vehicle.speedKmHr, Toast.LENGTH_SHORT).show();
            //
 
            LatLng startPosition = marker.getPosition();
 
-           LatLng finalPosition = LocationUtil.move(startPosition, vehicle.heading, ANIMATION_SPEED_MULTIPLIER * vehicle.speedKmHr*10/36, ANIMATION_MILLIS);
+           LatLng finalPosition = LocationUtil.move(startPosition, vehicle.heading, ANIMATION_SPEED_MULTIPLIER * vehicle.speedKmHr*10/36, mRefreshInterval);
 
            //startPosition
 
-           animateMarkerToICS(marker, finalPosition, new LatLngInterpolator.Linear());
+           animateMarkerToICS(marker, finalPosition, LINEAR, mRefreshInterval);
 
        } else {
            Log.w("UberMap", "Dunno this vehicle, dude.");
@@ -477,8 +595,14 @@ public class SanFranciscoMapFragment extends Fragment {
 
     }
 
+
+
     @TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
-    static void animateMarkerToICS(Marker marker, LatLng finalPosition, final LatLngInterpolator latLngInterpolator) {
+    void animateMarkerToICS(Marker marker, LatLng finalPosition, final LatLngInterpolator latLngInterpolator,long time) {
+
+       // ObjectAnimator exists = mAnimations.get(marker);
+       // exists.cancel();
+
         TypeEvaluator<LatLng> typeEvaluator = new TypeEvaluator<LatLng>() {
             @Override
             public LatLng evaluate(float fraction, LatLng startValue, LatLng endValue) {
@@ -490,12 +614,14 @@ public class SanFranciscoMapFragment extends Fragment {
 
         animator.setInterpolator(new LinearInterpolator());
 
-        animator.setDuration(ANIMATION_MILLIS);
+        animator.setDuration(time);
         animator.start();
+
+        mAnimations.put(marker, animator);
 
         Log.d("UberMap","Start on "+marker.getTitle());
     }
 
-    final static long ANIMATION_MILLIS = 20000;
-    final static long ANIMATION_SPEED_MULTIPLIER = 20; // for testing, otherwise use 1
+    // final static long ANIMATION_MILLIS = 20000;
+    final static long ANIMATION_SPEED_MULTIPLIER = 1;// 20; // for testing, otherwise use 1
 }
