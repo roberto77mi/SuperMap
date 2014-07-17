@@ -1,5 +1,6 @@
 package com.rf.ubermap;
 
+import android.animation.Animator;
 import android.animation.ObjectAnimator;
 import android.animation.TypeEvaluator;
 import android.annotation.TargetApi;
@@ -24,6 +25,7 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.AccelerateDecelerateInterpolator;
 import android.view.animation.Animation;
 import android.view.animation.LinearInterpolator;
 import android.widget.TextView;
@@ -47,6 +49,7 @@ import com.rf.ubermap.cluster.VehicleClusterRenderer;
 import com.rf.ubermap.util.LatLngInterpolator;
 import com.rf.ubermap.util.LocationUtil;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -73,6 +76,10 @@ import retrofit.converter.SimpleXmlConverter;
  *   http://www.zillow.com/howto/api/neighborhood-boundaries.htm  |  http://en.wikipedia.org/wiki/Shapefile
  *
  * - try to animate
+ *   TO IMPROVE
+ *   - do not pause between calls (I should just set the anim time longer than the interval between calls)
+ *   - start animations in a specific area as you move the camera close enough (currently waits to the next refresh)
+ *   - predict a better future position: currently linear with speed BUT, fast vehicles will slow down and slow vehicles will go faster
  *
  * - calculate some fun stats about density, direction, neighborhood, distances, etc
  *
@@ -106,7 +113,7 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
     final static LatLng SAN_FRANCISCO = new LatLng(37.7545458, -122.4408335);
     final static CameraPosition mCameraSanFrancisco = CameraPosition.fromLatLngZoom(SAN_FRANCISCO, 9f);
     final static float SAN_FRANCISCO_DEFAULT_ZOOM = 11.5f;
-    final static float SAN_FRANCISCO_ZOOM_ANIMATION = 13f;
+    final static float SAN_FRANCISCO_ZOOM_ANIMATION = 13.5f;
     final static float SF_CLUSTER_ZOOM = 12;
     final static int WHAT_REFRESH = 1;
     final static LatLngInterpolator LINEAR = new LatLngInterpolator.Linear();
@@ -257,7 +264,15 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
     public void onPause() {
         super.onPause();
         mMapView.onPause();
+        cancelCurrentAnimations();
     }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (mMainThreadHandler!=null) mMainThreadHandler.removeMessages(WHAT_REFRESH);
+    }
+
     @Override
     public void onLowMemory() {
         super.onLowMemory();
@@ -289,7 +304,13 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
         mMap.setOnCameraChangeListener(new GoogleMap.OnCameraChangeListener() {
             @Override
             public void onCameraChange(CameraPosition cameraPosition) {
-                Log.i("UberMap","Zoom="+cameraPosition.zoom);
+                Log.d("UberMap","Camera Changed = "+cameraPosition);
+
+                // if the zoom threashold has passed, start animating what is now visible if it's not moving yet
+                if (mMap.getCameraPosition().zoom > SAN_FRANCISCO_ZOOM_ANIMATION) {
+                    possiblyStartAnimate();
+                }
+
 
             }
         });
@@ -307,7 +328,22 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
 
     }
 
-    private void possiblyAnimateAll(final long inMillis) {
+    private synchronized void possiblyStartAnimate() {
+        final VisibleRegion region = mMap.getProjection().getVisibleRegion(); // UI Thread
+
+        for (Marker marker : mMarkerVehicleMap.keySet()){
+
+            if (!mAnimations.containsKey(marker) && region.latLngBounds.contains(marker.getPosition())){
+                Log.i("UberMap","Start animate ["+marker.getTitle()+"]. New in this region.");
+
+                startAnimate(marker); // it should catch up in position...
+
+            }
+
+        }
+    }
+
+        private void possiblyAnimateAll(final long inMillis) {
         if (mMap.getCameraPosition().zoom > SAN_FRANCISCO_ZOOM_ANIMATION) {
 
             setRefreshInterval(REFRESH_SLOW);
@@ -322,6 +358,9 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
 
                         if (region.latLngBounds.contains(marker.getPosition())){
                             Log.i("UberMap","["+marker.getTitle()+"] is in this region.");
+                            Animator currentAnim = mAnimations.get(marker);
+                            if (currentAnim!=null) currentAnim.cancel();
+
                             startAnimate(marker);
                             count++;
                         }
@@ -331,13 +370,6 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
                 }
             }, inMillis);
 
-
-
-
-
-
-
-
         } else {
             // far away, let the animation finish and reload stuff in 60 seconds
             setRefreshInterval(REFRESH_SLOW);
@@ -346,7 +378,8 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
     }
 
     private void cancelCurrentAnimations() {
-        for (ObjectAnimator anim : mAnimations.values()) {
+        for (ObjectAnimator anim : new ArrayList<ObjectAnimator>(mAnimations.values())) {
+            // prevents ConcurrentModificationException by iterating on a copy
             anim.cancel();
         }
         mAnimations.clear();
@@ -490,8 +523,7 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
         mShowClusters = false;
         hideClusters();
 
-        cancelCurrentAnimations();
-        // expect jumps from animated position to the new current correct position. Best to fast animate them!
+        // cancelCurrentAnimations();
 
         for (Vehicle vehicle : vehicles) {
             if (vehicle==null || vehicle.lat==0 || vehicle.routeTag==null) {
@@ -510,24 +542,23 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
 
                 // create new Marker
                 vehicleMarker = mMap.addMarker(new MarkerOptions().position(new LatLng(vehicle.lat, vehicle.lon))
-                        .draggable(false).title(vehicle.routeTag)
-                        .flat(true)
-                        .rotation(vehicle.heading - 90)
-                        .snippet(vehicle.routeTag+", "+vehicle.speedKmHr+"km/h")
-                        .alpha(vehicle.secsSinceReport > 120 ? 0.5f : vehicle.secsSinceReport > 60 ? 0.8f : 1)
-                        //.icon(BitmapDescriptorFactory.fromBitmap(bmp))
+                                .draggable(false).title(vehicle.routeTag)
+                                .flat(true)
+                                .rotation(vehicle.heading - 90)
+                                .snippet(vehicle.routeTag + ", " + vehicle.speedKmHr + "km/h")
+                                .alpha(vehicle.secsSinceReport > 120 ? 0.5f : vehicle.secsSinceReport > 60 ? 0.8f : 1)
+                                        //.icon(BitmapDescriptorFactory.fromBitmap(bmp))
 
-                        .icon(
-                                stopped ? (
-                                        alphabetic ? BitmapDescriptorFactory.fromResource(R.drawable.orange_dot) :
-                                                BitmapDescriptorFactory.fromResource(R.drawable.blue_dot)
-                                ) :
+                                .icon(
+                                        // stopped ? (
+                                        //         alphabetic ? BitmapDescriptorFactory.fromResource(R.drawable.orange_dot) :
+                                        //                 BitmapDescriptorFactory.fromResource(R.drawable.blue_dot)
+                                        // ) :
                                         (
                                                 alphabetic ? BitmapDescriptorFactory.fromResource(R.drawable.orange_tringle) :
                                                         BitmapDescriptorFactory.fromResource(R.drawable.blue_triangle)
                                         )
-                        )
-
+                                )
                 );
 
                 mVehiclesMap.put(vehicle.id, vehicleMarker);
@@ -537,6 +568,7 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
             } else {
                 vehicleMarker.setVisible(true);
 
+                vehicleMarker.setAlpha(vehicle.secsSinceReport > 120 ? 0.5f : vehicle.secsSinceReport > mRefreshInterval ? 0.8f : 1);
 
                 if (vehicle.secsSinceReport<mRefreshInterval/1000) {
                     Log.d("UberMap","Moving Vehicle '"+vehicle.routeTag+"'. Last Reported Position "+vehicle.secsSinceReport+" seconds ago.");
@@ -549,10 +581,9 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
                     // move vehicles
                   //  vehicleMarker.setPosition(new LatLng(vehicle.lat, vehicle.lon));
                     vehicleMarker.setRotation(vehicle.heading - 90); // TODO animate this
-                    vehicleMarker.setAlpha(vehicle.secsSinceReport > 120 ? 0.5f : vehicle.secsSinceReport > 60 ? 0.8f : 1);
-                    vehicleMarker.setSnippet(vehicle.routeTag+", "+vehicle.speedKmHr+"km/h");
+                    vehicleMarker.setSnippet(vehicle.routeTag + ", " + vehicle.speedKmHr + "km/h");
 
-                    animateMarkerToICS(vehicleMarker, new LatLng(vehicle.lat, vehicle.lon), LINEAR, 500);
+                    animateMarkerToICS(vehicleMarker, new LatLng(vehicle.lat, vehicle.lon), 500, true);
                 } else {
 
                     // the vehicle is moving by the animation, so I don't want to put it back where it was
@@ -604,21 +635,24 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
     }
 
 
-
+    // needs to be called by the UI Thread
     private void startAnimate(final Marker marker) {
        Vehicle vehicle = mMarkerVehicleMap.get(marker);
        if (vehicle!=null && vehicle.speedKmHr>0) {
 
            final LatLng startPosition = marker.getPosition();
 
-           final LatLng finalPosition = LocationUtil.move(startPosition, vehicle.heading, ANIMATION_SPEED_MULTIPLIER * vehicle.speedKmHr*10/36, mRefreshInterval);
+           float predictedAvgSpeed = vehicle.speedKmHr - ((vehicle.speedKmHr-15) / 4);
 
-           //startPosition
-           animateMarkerToICS(marker, finalPosition, LINEAR, mRefreshInterval);
+           final LatLng finalPosition = LocationUtil.move(
+                   startPosition,
+                   vehicle.heading, predictedAvgSpeed*10/36,
+                   mRefreshInterval-1000); // move of 1 less second, be conservative slow
 
+           animateMarkerToICS(marker, finalPosition, mRefreshInterval+1000, false); // animate for an extra second
 
        } else {
-           Log.w("UberMap", "Dunno this vehicle, dude.");
+           Log.w("UberMap", "Dunno this vehicle, dude. Marker Title: "+marker.getTitle());
        }
 
     }
@@ -626,7 +660,7 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
 
     // needs to be called by the UI Thread
     @TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
-    void animateMarkerToICS(Marker marker, LatLng finalPosition, final LatLngInterpolator latLngInterpolator,long time) {
+    void animateMarkerToICS(final Marker marker, final LatLng finalPosition, final long time, final boolean smooth) {
 
        // ObjectAnimator exists = mAnimations.get(marker);
        // exists.cancel();
@@ -634,19 +668,37 @@ public class SanFranciscoMapFragment extends Fragment implements Handler.Callbac
         TypeEvaluator<LatLng> typeEvaluator = new TypeEvaluator<LatLng>() {
             @Override
             public LatLng evaluate(float fraction, LatLng startValue, LatLng endValue) {
-                return latLngInterpolator.interpolate(fraction, startValue, endValue);
+                return LINEAR.interpolate(fraction, startValue, endValue);
             }
         };
         Property<Marker, LatLng> property = Property.of(Marker.class, LatLng.class, "position");
-        ObjectAnimator animator = ObjectAnimator.ofObject(marker, property, typeEvaluator, finalPosition);
+        final ObjectAnimator animator = ObjectAnimator.ofObject(marker, property, typeEvaluator, finalPosition);
 
-        animator.setInterpolator(new LinearInterpolator());
+        animator.setInterpolator(smooth? new AccelerateDecelerateInterpolator() : new LinearInterpolator());
 
         animator.setDuration(time);
         // animator.setStartDelay(500);
-        animator.start();
 
+        animator.addListener(new Animator.AnimatorListener() {
+            @Override
+            public void onAnimationStart(Animator animation) {
+
+            }
+
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                mAnimations.remove(marker);
+            }
+
+            @Override
+            public void onAnimationCancel(Animator animation) {}
+
+            @Override
+            public void onAnimationRepeat(Animator animation) {}
+        });
         mAnimations.put(marker, animator);
+
+        animator.start();
 
         Log.d("UberMap","Start on "+marker.getTitle());
     }

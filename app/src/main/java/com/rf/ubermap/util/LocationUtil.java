@@ -8,6 +8,8 @@ import android.util.Log;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 
+import java.text.NumberFormat;
+
 /**
  * Created by roberto on 7/8/14.
  */
@@ -28,23 +30,12 @@ public class LocationUtil {
 
     public static LatLng move(LatLng startPosition, float bearing, float speedMetersSeconds, float timeMillis) {
 
-        double distanceMeters = speedMetersSeconds + timeMillis/1000d;
+        double distanceMeters = speedMetersSeconds * (timeMillis/1000d); // remove 1 second, stay a little behind
 
-        Log.d("UberMap", "Moving by "+distanceMeters+" in "+timeMillis+" millis");
+        Log.d("UberMap", "Moving by "+ NumberFormat.getInstance().format(distanceMeters)+" meters in "+NumberFormat.getInstance().format(timeMillis/1000)+" seconds");
 
         return _move(startPosition.latitude,startPosition.longitude,bearing,distanceMeters);
 
-        /*
-        double meterStep = 0.0000898d; //0.00000898d;
-
-        double distanceLat = meterStep * distanceMeters * Math.cos(Math.toRadians(bearing));
-
-        double distanceLon = meterStep * distanceMeters * Math.sin(Math.toRadians(bearing));
-
-        LatLng finalPosition = new LatLng(startPosition.latitude + distanceLat, startPosition.longitude + distanceLon);
-
-        return finalPosition;
-        */
     }
 
     /**
