@@ -13,5 +13,13 @@
         <item>WARN</item>
         <item>ERROR</item>
     </array>
+    <array name="pref_geocoding_entries">
+        <item>Open Map Quest</item>
+        <item>Google Maps</item>
+    </array>
+    <array name="pref_geocoding_values">
+        <item>open_map_quest</item>
+        <item>google_maps</item>
+    </array>
 
 </resources>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <string name="app_name">SFMap</string>
+    <string name="app_name">SuperMap</string>
     <string name="title_section_home">Home</string>
     <string name="title_section_settings">Settings</string>
     <string name="title_section_about">About</string>
@@ -27,7 +27,7 @@
     <string name="dialog_cancel">Cancel</string>
 
     <string name="action_refresh">Refresh</string>
-    <string name="title_section_four_characters_map"><![CDATA[Boy & Girl Map]]></string>
+    <string name="title_section_four_characters_map">Tracking Map</string>
     <string name="title_section_sf_map">San Francisco Map</string>
     <string name="pref_sf_clusters">Cluster Vehicles</string>
     <string name="pref_sf_landmarks">Show Landmarks</string>
@@ -35,5 +35,10 @@
     <string name="sf_api_fail">Error Loading Data</string>
     <string name="sf_vehicles">vehicles</string>
     <string name="sf_loading">loading...</string>
+    <string name="pref_4char_map_category">Tracking Map</string>
+    <string name="pref_tracking_map_category">Tracking Map</string>
+    <string name="pref_geocoding">Geocoding Service</string>
+    <string name="pref_geocoding_default">google_maps</string>
+    <string name="title_section_tracking_map">Tracking Map</string>
 
 </resources>

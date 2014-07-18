@@ -21,11 +21,14 @@ import com.rf.ubermap.util.LocationUtil;
 import android.app.Fragment;
 import android.content.Context;
 import android.content.Intent;
+import android.location.Address;
+import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -34,6 +37,8 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.IOException;
+import java.lang.ref.SoftReference;
 import java.text.NumberFormat;
 import java.util.LinkedList;
 import java.util.List;
@@ -62,6 +67,9 @@ import retrofit.client.Response;
  * --> Google Places API
  * https://developers.google.com/places/
  *
+ * --
+ * https://maps.googleapis.com/maps/api/geocode/json?latlng=40.714224,-73.961452
+ *
  * -->
  * http://www.fleetmon.com/products/services_data
  *
@@ -75,6 +83,11 @@ import retrofit.client.Response;
  *
  *
  * https://developers.google.com/maps/documentation/android/utility/
+ *
+ *
+ * TODO implement reverse Geocoder in a generic configurable way and with a listener to update the UI.
+ * TODO actually, create many useful configurable and reusable location services using a listener interface
+ *
  */
 
 public class MapFragment extends Fragment implements 
@@ -114,11 +127,11 @@ GoogleMap.OnCameraChangeListener {
     RestAdapter mMapQuestAdapter;
     OpenMapQuest mOpenMapQuestApi;
 
+    boolean mGeocoderAvailable = true;
+    Geocoder geo;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
-
-        Log.i("UberMap", "--------------------------------- map fragment created");
-
         //setRetainInstance(true);
 
         super.onCreate(savedInstanceState);
@@ -133,13 +146,17 @@ GoogleMap.OnCameraChangeListener {
 
         mOpenMapQuestApi = mMapQuestAdapter.create(OpenMapQuest.class);
 
-
+        geo = new Geocoder(getActivity());
+        if (!geo.isPresent()) {
+            mGeocoderAvailable = false;
+            Log.w("UberMap", "Google Maps Geocoder not available");
+        }
     }
 
     @Override
 	public View onCreateView(LayoutInflater inflater, ViewGroup container,
 			Bundle savedInstanceState) {
-        Log.i("UberMap", "--------------------------------- map CreateView");
+        //Log.i("UberMap", "--------------------------------- map CreateView");
 
 		View rootView = inflater.inflate(R.layout.fragment_map,
 				container, false);
@@ -153,7 +170,7 @@ GoogleMap.OnCameraChangeListener {
 				isGooglePlayServicesAvailable(getActivity());
 		// If Google Play services is available
 		if (ConnectionResult.SUCCESS == resultCode) {
-			Toast.makeText(getActivity(), "ok!", Toast.LENGTH_SHORT).show();
+			// Toast.makeText(getActivity(), "ok!", Toast.LENGTH_SHORT).show();
 		} else {
             Toast.makeText(getActivity(), "Google Play Services not available", Toast.LENGTH_SHORT).show();
         }
@@ -413,35 +430,47 @@ GoogleMap.OnCameraChangeListener {
         marker.setSnippet("...where am I?");
         marker.showInfoWindow();
 
-        mOpenMapQuestApi.reverseGeocode(OpenMapQuest.Util.toQuery(marker.getPosition()), new Callback<List<OpenMapQuest.MapQuestPlace>>() {
-            @Override
-            public void success(List<OpenMapQuest.MapQuestPlace> mapQuestResponse, Response response) {
+        reverseGeocode(marker);
 
-                if (mapQuestResponse!=null && mapQuestResponse.size()>0) {
-                    OpenMapQuest.MapQuestPlace mapQuestPlace = mapQuestResponse.get(0);
+    }
 
-                    if (mCameraPosition.zoom<5) {
-                        marker.setSnippet("Hi! I'm in " + mapQuestPlace.getCountry());
-                    } else if (mCameraPosition.zoom<12) {
-                        marker.setSnippet("Hi! I'm in " + mapQuestPlace.getDisplayCity());
-                    } else {
-                        marker.setSnippet("I'm in " + mapQuestPlace.getDisplaySuburb());
+    private void reverseGeocode(final Marker marker) {
+
+        if (mGeocoderAvailable && "google_maps".equals(PreferenceManager.getDefaultSharedPreferences(getActivity()).getString("pref_geocoding",null))){
+
+            new GeocoderAsyncTask(marker).execute();
+
+        } else {
+
+            mOpenMapQuestApi.reverseGeocode(OpenMapQuest.Util.toQuery(marker.getPosition()), new Callback<List<OpenMapQuest.MapQuestPlace>>() {
+                @Override
+                public void success(List<OpenMapQuest.MapQuestPlace> mapQuestResponse, Response response) {
+
+                    if (mapQuestResponse != null && mapQuestResponse.size() > 0) {
+                        OpenMapQuest.MapQuestPlace mapQuestPlace = mapQuestResponse.get(0);
+
+                        if (mCameraPosition.zoom < 5) {
+                            marker.setSnippet("Hi! I'm in " + mapQuestPlace.getCountry());
+                        } else if (mCameraPosition.zoom < 12) {
+                            marker.setSnippet("Hi! I'm in " + mapQuestPlace.getDisplayCity());
+                        } else {
+                            marker.setSnippet("I'm in " + mapQuestPlace.getDisplaySuburb());
+                        }
+
+                        marker.showInfoWindow();
                     }
-
-                    marker.showInfoWindow();
                 }
-            }
 
-            @Override
-            public void failure(RetrofitError retrofitError) {
-                marker.setSnippet("Oh No! "+retrofitError.getLocalizedMessage());
-                marker.showInfoWindow();
+                @Override
+                public void failure(RetrofitError retrofitError) {
+                    marker.setSnippet("Oh No! " + retrofitError.getLocalizedMessage());
+                    marker.showInfoWindow();
 
 
-                Log.e("UberMap",retrofitError.getMessage());
-            }
-        });
-
+                    Log.e("UberMap", retrofitError.getMessage());
+                }
+            });
+        }
     }
 
     @Override
@@ -489,5 +518,51 @@ GoogleMap.OnCameraChangeListener {
         }
     }
 
+
+    class GeocoderAsyncTask extends AsyncTask<LatLng, Void, Address> {
+        SoftReference<Marker> refMarker;
+
+        LatLng location;
+
+        public GeocoderAsyncTask(final Marker marker) {
+            refMarker = new SoftReference<Marker>(marker);
+        }
+
+        @Override
+        protected void onPreExecute() {
+            location = refMarker.get().getPosition();
+        }
+
+        @Override
+        protected Address doInBackground(LatLng... params) {
+
+            location = params.length>0 ? params[0] : location;
+
+            try {
+                List<Address> addresses = geo.getFromLocation(location.latitude, location.longitude, 1);
+                if (addresses!=null && addresses.size()>0) return addresses.get(0);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Address address) {
+            if (!isAdded()) return;
+            Marker marker = refMarker.get();
+
+            if (marker==null) return;
+
+            if (address!=null) {
+                marker.setSnippet("I'm in "+address.getCountryName());
+            } else {
+                marker.setSnippet(" ? ");
+            }
+
+            marker.showInfoWindow();
+        }
+    }
 
 }

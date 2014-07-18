@@ -25,15 +25,6 @@ public class SettingsFragment extends PreferenceFragment implements SharedPrefer
     }
 
     @Override
-    public void onResume() {
-        super.onResume();
-        for (int i = 0; i < getPreferenceScreen().getPreferenceCount(); ++i) {
-            Preference preference = getPreferenceScreen().getPreference(i);
-            updatePref(preference);
-        }
-    }
-
-    @Override
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
         updatePref(findPreference(key));
     }

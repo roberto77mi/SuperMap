@@ -13,6 +13,7 @@
         android:dialogTitle="@string/pref_debug_level"
         android:entries="@array/pref_debug_levels_entries"
         android:entryValues="@array/pref_debug_levels_values"
+        android:summary="%s"
         android:defaultValue="@string/pref_debug_level_default" />
 
     <PreferenceCategory android:title="@string/pref_sf_map_category">
@@ -27,5 +28,16 @@
 
 
     </PreferenceCategory>
+    <PreferenceCategory android:title="@string/pref_tracking_map_category">
 
+        <ListPreference
+            android:key="pref_geocoding"
+            android:title="@string/pref_geocoding"
+            android:dialogTitle="@string/pref_geocoding"
+            android:summary="%s"
+            android:entries="@array/pref_geocoding_entries"
+            android:entryValues="@array/pref_geocoding_values"
+            android:defaultValue="@string/pref_geocoding_default" />
+
+    </PreferenceCategory>
 </PreferenceScreen>
