@@ -1,4 +1,4 @@
-= UberMap =
+= SuperMap =
 
 last updated July 15th 2014
 
@@ -13,7 +13,7 @@ UI & Android SDK
 - Async Reverse Geocoding when the marker is dropped (with Retrofit)
 - On Camera change, rotate bearing, calculate distance
 - Location API, get your location, register for update (in progress)
-
+- Google Geocoder (not clear when availble)
 
 
 API
